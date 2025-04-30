@@ -1,0 +1,19 @@
+{
+  "listen": ":6060",
+  "timeout": 30,
+  "verbose": false,
+  "targets": [
+    {
+      "path": "/mtn",
+      "targetUrl": "https://proxy.momoapi.mtn.com",
+      "insecure": false,
+      "stripPrefix": true
+    },
+    {
+      "path": "/airtel",
+      "targetUrl": "https://openapi.airtel.africa",
+      "insecure": false,
+      "stripPrefix": true
+    }
+  ]
+}

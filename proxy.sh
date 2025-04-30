@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Simple HTTPS proxy deployment script
+# HTTPS proxy deployment script with multi-target support
 
 # Colors for better output
 GREEN='\033[0;32m'
@@ -32,8 +32,8 @@ build() {
   print_info "Build successful"
 }
 
-# Run the proxy
-run() {
+# Run the proxy in legacy single-target mode
+run_legacy() {
   # Check if built
   if [ ! -f "./https-proxy" ]; then
     print_warn "Proxy not built yet, building now..."
@@ -84,23 +84,146 @@ run() {
   $CMD
 }
 
+# Run the proxy with a config file (multi-target mode)
+run_with_config() {
+  # Check if built
+  if [ ! -f "./https-proxy" ]; then
+    print_warn "Proxy not built yet, building now..."
+    build
+  fi
+  
+  # Validate required arguments
+  if [ -z "$1" ]; then
+    print_error "Missing config file path. Usage: $0 run-config config.json [options]"
+  fi
+  
+  CONFIG_FILE=$1
+  shift # Remove the first argument (config file)
+  
+  # Check if config file exists
+  if [ ! -f "$CONFIG_FILE" ]; then
+    print_error "Config file not found: $CONFIG_FILE"
+  fi
+  
+  # Default settings
+  PORT=8000
+  VERBOSE=false
+  TIMEOUT=30
+  
+  # Parse remaining options
+  while [[ "$#" -gt 0 ]]; do
+    case $1 in
+      --port=*) PORT="${1#*=}" ;;
+      --verbose) VERBOSE=true ;;
+      --timeout=*) TIMEOUT="${1#*=}" ;;
+      *) print_warn "Unknown parameter: $1" ;;
+    esac
+    shift
+  done
+  
+  # Build command
+  CMD="./https-proxy --config=$CONFIG_FILE --listen=:$PORT --timeout=$TIMEOUT"
+  
+  if [ "$VERBOSE" = true ]; then
+    CMD="$CMD --verbose"
+  fi
+  
+  # Start the proxy
+  print_info "Starting multi-target proxy on port $PORT using config: $CONFIG_FILE"
+  print_info "Command: $CMD"
+  $CMD
+}
+
+# Create a sample config file
+create_config() {
+  CONFIG_FILE="config.json"
+  
+  if [ -f "$CONFIG_FILE" ]; then
+    read -p "File $CONFIG_FILE already exists. Overwrite? (y/n): " CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+      print_info "Operation cancelled"
+      return
+    fi
+  fi
+  
+  cat > "$CONFIG_FILE" << EOF
+{
+  "listen": ":8000",
+  "timeout": 30,
+  "verbose": false,
+  "targets": [
+    {
+      "path": "/api/v1",
+      "targetUrl": "https://api-v1.example.com",
+      "insecure": false,
+      "stripPrefix": true
+    },
+    {
+      "path": "/api/v2",
+      "targetUrl": "https://api-v2.example.com",
+      "insecure": false,
+      "stripPrefix": true
+    },
+    {
+      "path": "/",
+      "targetUrl": "https://default.example.com",
+      "insecure": false,
+      "stripPrefix": false
+    }
+  ]
+}
+EOF
+  
+  print_info "Created sample config file: $CONFIG_FILE"
+  print_info "Edit this file with your actual target URLs and settings"
+}
+
 # Show help
 show_help() {
   echo "HTTPS Proxy Server"
   echo
   echo "Usage:"
-  echo "  $0 build                    Build the proxy server"
-  echo "  $0 run TARGET_URL [options] Run the proxy server"
+  echo "  $0 build                      Build the proxy server"
+  echo "  $0 run TARGET_URL [options]   Run in single-target mode"
+  echo "  $0 run-config CONFIG [options] Run in multi-target mode with config file"
+  echo "  $0 create-config              Create a sample config file"
   echo
-  echo "Options:"
+  echo "Single-target Options:"
   echo "  --port=NUMBER       Port to listen on (default: 8000)"
   echo "  --verbose           Enable verbose logging of requests and responses"
   echo "  --insecure          Skip TLS certificate verification (for self-signed certs)"
   echo "  --timeout=NUMBER    Request timeout in seconds (default: 30)"
   echo
+  echo "Multi-target Options:"
+  echo "  --port=NUMBER       Port to listen on (overrides config file)"
+  echo "  --verbose           Enable verbose logging (overrides config file)"
+  echo "  --timeout=NUMBER    Request timeout in seconds (overrides config file)"
+  echo
   echo "Examples:"
   echo "  $0 run https://api.example.com"
   echo "  $0 run https://api.example.com --port=9000 --insecure --verbose"
+  echo "  $0 run-config config.json --verbose"
+  echo
+  echo "Config file format (JSON):"
+  echo '{
+  "listen": ":8000",
+  "timeout": 30,
+  "verbose": false,
+  "targets": [
+    {
+      "path": "/api/v1",
+      "targetUrl": "https://api-v1.example.com",
+      "insecure": false,
+      "stripPrefix": true
+    },
+    {
+      "path": "/",
+      "targetUrl": "https://default.example.com",
+      "insecure": false,
+      "stripPrefix": false
+    }
+  ]
+}'
 }
 
 # Main command processing
@@ -110,7 +233,14 @@ case "$1" in
     ;;
   run)
     shift # Remove 'run' argument
-    run "$@"
+    run_legacy "$@"
+    ;;
+  run-config)
+    shift # Remove 'run-config' argument
+    run_with_config "$@"
+    ;;
+  create-config)
+    create_config
     ;;
   help|--help|-h)
     show_help
