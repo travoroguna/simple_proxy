@@ -24,11 +24,11 @@ type ProxyConfig struct {
 
 // ProxyConfigs holds multiple proxy configurations
 type ProxyConfigs struct {
-	Listen     string        `json:"listen"`     // Address to listen on
-	Timeout    int           `json:"timeout"`    // Request timeout in seconds
-	Verbose    bool          `json:"verbose"`    // Enable verbose logging
-	Targets    []ProxyConfig `json:"targets"`    // Target configurations
-	ConfigFile string        `json:"-"`          // Not serialized, just for CLI
+	Listen     string        `json:"listen"`  // Address to listen on
+	Timeout    int           `json:"timeout"` // Request timeout in seconds
+	Verbose    bool          `json:"verbose"` // Enable verbose logging
+	Targets    []ProxyConfig `json:"targets"` // Target configurations
+	ConfigFile string        `json:"-"`       // Not serialized, just for CLI
 }
 
 // ProxyTarget holds a target configuration and its handler
@@ -53,7 +53,7 @@ func (r *CustomRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	for i := range r.Targets {
 		target := &r.Targets[i]
-		
+
 		// Check if the request path starts with this target's path
 		if strings.HasPrefix(req.URL.Path, target.Config.Path) {
 			// Check if this is a more specific match than what we've found so far
@@ -141,7 +141,7 @@ func main() {
 	// Create our custom router
 	router := &CustomRouter{
 		Targets: []ProxyTarget{},
-		Logger: logger,
+		Logger:  logger,
 	}
 
 	// Set up each proxy target
@@ -154,7 +154,7 @@ func main() {
 
 		// Check if target is HTTPS
 		if parsedURL.Scheme != "https" {
-			logger.Printf("Warning: Target URL scheme is %s, not https for path %s", 
+			logger.Printf("Warning: Target URL scheme is %s, not https for path %s",
 				parsedURL.Scheme, targetConfig.Path)
 		}
 
@@ -187,15 +187,15 @@ func main() {
 			}
 
 			originalDirector(req)
-			
+
 			// Explicitly set the Host header to match the target's host
 			req.Host = parsedURL.Host
-			
+
 			// Log request details if verbose
 			if configs.Verbose {
 				logRequest(logger, req, fmt.Sprintf("[Target %d]", i+1))
 			} else {
-				logger.Printf("[Target %d] %s %s -> %s (Host: %s, Original Path: %s)", 
+				logger.Printf("[Target %d] %s %s -> %s (Host: %s, Original Path: %s)",
 					i+1, req.Method, req.URL.Path, parsedURL.String()+req.URL.Path, req.Host, originalPath)
 			}
 		}
@@ -216,10 +216,10 @@ func main() {
 			if configs.Verbose {
 				// Create a response recorder
 				recorder := newResponseRecorder(w)
-				
+
 				// Process the request with our recorder
 				proxy.ServeHTTP(recorder, r)
-				
+
 				// Log the response
 				logResponse(logger, recorder, fmt.Sprintf("[Target %d]", i+1))
 			} else {
@@ -235,13 +235,13 @@ func main() {
 			Index:   i,
 		})
 
-		logger.Printf("Configured proxy for path %s (and subpaths) -> %s (Insecure: %v, StripPrefix: %v)", 
+		logger.Printf("Configured proxy for path %s (and subpaths) -> %s (Insecure: %v, StripPrefix: %v)",
 			targetConfig.Path, targetConfig.TargetURL, targetConfig.Insecure, targetConfig.StripPrefix)
 	}
 
 	// Start the server
 	logger.Printf("Starting proxy server on %s with %d targets", configs.Listen, len(configs.Targets))
-	
+
 	server := &http.Server{
 		Addr:         configs.Listen,
 		Handler:      router,
@@ -268,7 +268,7 @@ func logRequest(logger *log.Logger, req *http.Request, prefix ...string) {
 		logger.Printf("%sError dumping request: %v", prefixStr, err)
 		return
 	}
-	
+
 	// Log with formatting
 	logger.Printf("\n%s%s[REQUEST]%s\n%s\n%s[END REQUEST]%s\n",
 		prefixStr,
@@ -292,7 +292,7 @@ func logResponse(logger *log.Logger, recorder *responseRecorder, prefix ...strin
 		strings.Repeat("=", 30),
 		recorder.statusCode,
 		strings.Repeat("=", 30))
-	
+
 	// Log headers
 	logger.Println(prefixStr + "Headers:")
 	for key, values := range recorder.Header() {
@@ -300,19 +300,19 @@ func logResponse(logger *log.Logger, recorder *responseRecorder, prefix ...strin
 			logger.Printf("%s  %s: %s", prefixStr, key, value)
 		}
 	}
-	
+
 	// Log body if exists (truncate if too large)
 	if len(recorder.body) > 0 {
 		maxBodyLogSize := 1000
 		body := recorder.body
 		if len(body) > maxBodyLogSize {
-			logger.Printf("\n%sBody (truncated to %d bytes):\n%s... [truncated]", 
+			logger.Printf("\n%sBody (truncated to %d bytes):\n%s... [truncated]",
 				prefixStr, maxBodyLogSize, body[:maxBodyLogSize])
 		} else {
 			logger.Printf("\n%sBody:\n%s", prefixStr, body)
 		}
 	}
-	
+
 	logger.Printf("\n%s%s[END RESPONSE]%s\n",
 		prefixStr,
 		strings.Repeat("=", 30),
