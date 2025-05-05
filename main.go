@@ -31,6 +31,51 @@ type ProxyConfigs struct {
 	ConfigFile string        `json:"-"`          // Not serialized, just for CLI
 }
 
+// ProxyTarget holds a target configuration and its handler
+type ProxyTarget struct {
+	Config  ProxyConfig
+	Handler http.Handler
+	Index   int
+}
+
+// CustomRouter is a router that can handle path prefixes properly
+type CustomRouter struct {
+	Targets  []ProxyTarget
+	Fallback http.Handler
+	Logger   *log.Logger
+}
+
+// ServeHTTP implements the http.Handler interface for our custom router
+func (r *CustomRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// Find the most specific matching target
+	var matchedTarget *ProxyTarget
+	matchedPathLen := 0
+
+	for i := range r.Targets {
+		target := &r.Targets[i]
+		
+		// Check if the request path starts with this target's path
+		if strings.HasPrefix(req.URL.Path, target.Config.Path) {
+			// Check if this is a more specific match than what we've found so far
+			pathLen := len(target.Config.Path)
+			if pathLen > matchedPathLen {
+				matchedTarget = target
+				matchedPathLen = pathLen
+			}
+		}
+	}
+
+	if matchedTarget != nil {
+		matchedTarget.Handler.ServeHTTP(w, req)
+	} else if r.Fallback != nil {
+		r.Fallback.ServeHTTP(w, req)
+	} else {
+		// No match found
+		r.Logger.Printf("No target configured for path: %s", req.URL.Path)
+		http.NotFound(w, req)
+	}
+}
+
 func main() {
 	// Parse command line arguments
 	configs := ProxyConfigs{
@@ -93,13 +138,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create a router for multiple targets
-	mux := http.NewServeMux()
+	// Create our custom router
+	router := &CustomRouter{
+		Targets: []ProxyTarget{},
+		Logger: logger,
+	}
 
 	// Set up each proxy target
-	for i, target := range configs.Targets {
-		targetConfig := target // Create a local copy to avoid issues with closures
-
+	for i, targetConfig := range configs.Targets {
 		// Parse the target URL
 		parsedURL, err := url.Parse(targetConfig.TargetURL)
 		if err != nil {
@@ -182,10 +228,14 @@ func main() {
 			}
 		})
 
-		// Register the handler for this path
-		mux.Handle(targetConfig.Path, proxyHandler)
+		// Add this target to our router
+		router.Targets = append(router.Targets, ProxyTarget{
+			Config:  targetConfig,
+			Handler: proxyHandler,
+			Index:   i,
+		})
 
-		logger.Printf("Configured proxy for path %s -> %s (Insecure: %v, StripPrefix: %v)", 
+		logger.Printf("Configured proxy for path %s (and subpaths) -> %s (Insecure: %v, StripPrefix: %v)", 
 			targetConfig.Path, targetConfig.TargetURL, targetConfig.Insecure, targetConfig.StripPrefix)
 	}
 
@@ -194,7 +244,7 @@ func main() {
 	
 	server := &http.Server{
 		Addr:         configs.Listen,
-		Handler:      mux,
+		Handler:      router,
 		ReadTimeout:  time.Duration(configs.Timeout) * time.Second,
 		WriteTimeout: time.Duration(configs.Timeout) * time.Second,
 	}
