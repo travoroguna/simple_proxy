@@ -16,8 +16,15 @@
       "stripPrefix": true
     },
     {
+
       "path": "/airtel_sandbox",
       "targetUrl": "https://openapiuat.airtel.africa",
+      "insecure": false,
+      "stripPrefix": true
+    },
+    {
+      "path": "/awa",
+      "targetUrl": "https://api.awanetwork.tech",
       "insecure": false,
       "stripPrefix": true
     }
