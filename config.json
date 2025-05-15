@@ -27,6 +27,12 @@
       "targetUrl": "https://api.awanetwork.tech",
       "insecure": false,
       "stripPrefix": true
+    },
+    {
+      "path": "/paydrc",
+      "targetUrl": "https://paydrc.gofreshbakery.net",
+      "insecure": false,
+      "stripPrefix": true
     }
   ]
 }
