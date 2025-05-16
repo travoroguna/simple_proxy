@@ -33,6 +33,12 @@
       "targetUrl": "https://paydrc.gofreshbakery.net",
       "insecure": false,
       "stripPrefix": true
+    },
+    {
+      "path": "/flutterwave",
+      "targetUrl": "https://api.flutterwave.com",
+      "insecure": false,
+      "stripPrefix": true
     }
   ]
 }
